@@ -7,6 +7,8 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Components/LMAHealthComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 ALMADefaultCharacter::ALMADefaultCharacter()
 {
@@ -25,6 +27,8 @@ ALMADefaultCharacter::ALMADefaultCharacter()
 	CameraComponent->SetFieldOfView(FOV);
 	CameraComponent->bUsePawnControlRotation = false;
 
+	HealthComponent = CreateDefaultSubobject<ULMAHealthComponent>("HealthComponent");
+
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
@@ -38,22 +42,19 @@ void ALMADefaultCharacter::BeginPlay()
 	{
 		CurrentCursor = UGameplayStatics::SpawnDecalAtLocation(GetWorld(), CursorMaterial, CursorSize, FVector(0));
 	}
+
+	OnHealthChanged(HealthComponent->GetHealth());
+	HealthComponent->OnDeath.AddUObject(this, &ALMADefaultCharacter::OnDeath);
+	HealthComponent->OnHealthChanged.AddUObject(this, &ALMADefaultCharacter::OnHealthChanged);
 }
 
 void ALMADefaultCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	APlayerController* PC = UGameplayStatics ::GetPlayerController(GetWorld(), 0);
-	if (PC)
+	if ((HealthComponent->IsAlive()))
 	{
-		FHitResult ResultHit;
-		PC->GetHitResultUnderCursor(ECC_GameTraceChannel1, true, ResultHit);
-		float FindRotatorResultYaw = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), ResultHit.Location).Yaw;
-		SetActorRotation(FQuat(FRotator(0.0f, FindRotatorResultYaw, 0.0f)));
-		if (CurrentCursor)
-		{
-			CurrentCursor->SetWorldLocation(ResultHit.Location);
-		}
+		RotationPlayerOnCursor();
+		StaminaChange();
 	}
 }
 
@@ -63,8 +64,10 @@ void ALMADefaultCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 
 	PlayerInputComponent->BindAxis("MoveForward", this, &ALMADefaultCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("MoveRight", this, &ALMADefaultCharacter::MoveRight);
-
 	PlayerInputComponent->BindAxis("CameraZoom", this, &ALMADefaultCharacter::CameraZoom);
+
+	PlayerInputComponent->BindAction("Sprint", IE_Pressed, this, &ALMADefaultCharacter::Sprint);
+	PlayerInputComponent->BindAction("Sprint", IE_Released, this, &ALMADefaultCharacter::Jog);
 }
 
 void ALMADefaultCharacter::MoveForward(float Value)
@@ -89,4 +92,87 @@ void ALMADefaultCharacter::CameraZoom(float Value)
 		ArmLength = MaxZoom;
 	}
 	SpringArmComponent->TargetArmLength = ArmLength;
+}
+
+void ALMADefaultCharacter::RotationPlayerOnCursor()
+{
+	APlayerController* PC = UGameplayStatics ::GetPlayerController(GetWorld(), 0);
+	if (PC)
+	{
+		FHitResult ResultHit;
+		PC->GetHitResultUnderCursor(ECC_GameTraceChannel1, true, ResultHit);
+		float FindRotatorResultYaw = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), ResultHit.Location).Yaw;
+		SetActorRotation(FQuat(FRotator(0.0f, FindRotatorResultYaw, 0.0f)));
+		if (CurrentCursor)
+		{
+			CurrentCursor->SetWorldLocation(ResultHit.Location);
+		}
+	}
+}
+
+void ALMADefaultCharacter::OnDeath()
+{
+	CurrentCursor->DestroyRenderState_Concurrent();
+	PlayAnimMontage(DeathMontage);
+	GetCharacterMovement()->DisableMovement();
+	SetLifeSpan(5.0f);
+	if (Controller)
+	{
+		Controller->ChangeState(NAME_Spectating);
+	}
+}
+
+void ALMADefaultCharacter::OnHealthChanged(float NewHealth)
+{
+	GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, FString::Printf(TEXT("Health = %f"), NewHealth));
+}
+
+void ALMADefaultCharacter::Sprint()
+{
+	if (!IsExhausted && GetCharacterMovement())
+	{
+		IsSprinting = true;
+		GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
+	}
+	else
+	{
+		IsSprinting = false;
+		GetCharacterMovement()->MaxWalkSpeed = JogSpeed;
+	}
+}
+
+void ALMADefaultCharacter::Jog()
+{
+	if (IsSprinting)
+	{
+		IsSprinting = false;
+	}
+	GetCharacterMovement()->MaxWalkSpeed = JogSpeed;
+}
+
+void ALMADefaultCharacter::StaminaChange()
+{
+	if (!IsSprinting && CurrentStamina < MaxStamina)
+	{
+		CurrentStamina += StaminaRecovery;
+	}
+	else if (!IsSprinting)
+	{
+		CurrentStamina = MaxStamina;
+		if (IsExhausted)
+		{
+			IsExhausted = false;
+		}
+	}
+	else if (IsSprinting && CurrentStamina > 0)
+	{
+		CurrentStamina -= StaminaDecrease;
+	}
+	else if (IsSprinting)
+	{
+		CurrentStamina = 0;
+		IsSprinting = false;
+		IsExhausted = true;
+		GetCharacterMovement()->MaxWalkSpeed = JogSpeed;
+	}
 }

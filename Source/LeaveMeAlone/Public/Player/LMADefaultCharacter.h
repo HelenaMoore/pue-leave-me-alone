@@ -8,6 +8,8 @@
 
 class UCameraComponent;
 class USpringArmComponent;
+class ULMAHealthComponent;
+class UAnimMontage;
 
 UCLASS()
 class LEAVEMEALONE_API ALMADefaultCharacter : public ACharacter
@@ -17,6 +19,9 @@ class LEAVEMEALONE_API ALMADefaultCharacter : public ACharacter
 public:
 	ALMADefaultCharacter();
 
+	UFUNCTION()
+	ULMAHealthComponent* GetHealthComponent() const { return HealthComponent; }
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
 	USpringArmComponent* SpringArmComponent;
@@ -24,11 +29,32 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
 	UCameraComponent* CameraComponent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components|Camera")
 	float MaxZoom = 3000.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components|Camera")
 	float MinZoom = 300.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components|Health")
+	ULMAHealthComponent* HealthComponent;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components|Speed")
+	float JogSpeed = 300.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components|Speed")
+	float SprintSpeed = 600.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components|Stamina")
+	float MaxStamina = 100.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components|Stamina")
+	float CurrentStamina = 100.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components|Stamina")
+	float StaminaDecrease = 0.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components|Stamina")
+	float StaminaRecovery = 0.25f;
 
 	UPROPERTY()
 	UDecalComponent* CurrentCursor = nullptr;
@@ -38,6 +64,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cursor")
 	FVector CursorSize = FVector(20.0f, 40.0f, 40.0f);
+
+	UPROPERTY(EditDefaultsOnly, Category = "Animation")
+	UAnimMontage* DeathMontage;
 
 	virtual void BeginPlay() override;
 
@@ -54,4 +83,15 @@ private:
 	void MoveForward(float Value);
 	void MoveRight(float Value);
 	void CameraZoom(float Value);
+
+	void OnDeath();
+	void OnHealthChanged(float NewHealth);
+
+	bool IsSprinting = false;
+	bool IsExhausted = false;
+	void Sprint();
+	void Jog();
+	void StaminaChange();
+
+	void RotationPlayerOnCursor();
 };
