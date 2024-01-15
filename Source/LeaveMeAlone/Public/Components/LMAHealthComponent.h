@@ -20,9 +20,7 @@ public:
 	UFUNCTION(BlueprintCallable)
 	float GetHealth() const { return Health; }
 
-	UFUNCTION(BlueprintCallable)
 	bool IsAlive() const;
-
 	bool AddHealth(float NewHealth);
 	bool IsHealthFull() const;
 
@@ -38,7 +36,7 @@ protected:
 private:
 	float Health = 0.0f;
 
-	UFUNCTION()
+	UFUNCTION(BlueprintCallable)
 	void OnTakeAnyDamage(AActor* DamageActor, float Damage, const class UDamageType* DamageType, 
 						 class AController* InstigatedBy, AActor* DamageCauser);
 };

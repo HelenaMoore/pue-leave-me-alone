@@ -61,6 +61,8 @@ protected:
 public:	
 	virtual void Tick(float DeltaTime) override;
 
+	FAmmoWeapon GetCurrentAmmoWeapon() const { return CurrentAmmoWeapon; }
+
 private:
 	FAmmoWeapon CurrentAmmoWeapon;
 };
